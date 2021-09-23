@@ -37,9 +37,9 @@ void communicate(int connectionfd) {
     // printf("From client: %d",(arr[1]));
 
     // printing the received hash:
-    for (int i = 31; i >= 0; i--) {
+    /*for (int i = 31; i >= 0; i--) {
         printf("hashnumber: number %d is %d\t",i,arr[i]);
-    }
+    }*/
     // calculating the hash as a uint256
     printf("\n\n");
     //
@@ -164,15 +164,18 @@ int main(int argc, char *argcv[]) {
     printf("Waiting..");
     connfd = accept(socketfd, (SA*)&cli, &len);
     printf("ACCEPTED");
-    if (connfd < 0) {
-        printf("server acccept failed...\n");
-        exit(0);
+    while (connfd) {
+        if (connfd < 0) {
+            printf("server acccept failed...\n");
+            break;
+        }
+        else {
+            printf("connfd is: %d", connfd);
+            printf("server acccept the client...\n");
+        }
+        communicate(connfd);
+        connfd = accept(socketfd, (SA*)&cli, &len);
     }
-    else
-        printf("server acccept the client...\n");
-    communicate(connfd);
-    connfd = accept(socketfd, (SA*)&cli, &len);
-    communicate(connfd);
     close(connfd);
 
 
