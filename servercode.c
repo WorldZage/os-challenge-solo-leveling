@@ -61,9 +61,9 @@ void communicate(int connectionfd) {
     // calculating end value:
     uint64_t end = 0; // = arr[39] | (arr[38] << 8) | (arr[37] << 16) | (arr[36] << 24) | (arr[35] << 32); // | (arr[34] << 40) | (arr[33] << 48) | (arr[32] << 56);
     for (int i = 0; i < 8; i++) {
-        end = end | (arr[39-i] << i*8);
+        end = end | (arr[47-i] << i*8);
     }
-    printf("start is: %ld\t",end);
+    printf("end is: %ld\t",end);
 
     /* n = 0;
     for (n = 0; n < inSize; n++ ) {
