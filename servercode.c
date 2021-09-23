@@ -171,6 +171,8 @@ int main(int argc, char *argcv[]) {
     else
         printf("server acccept the client...\n");
     communicate(connfd);
+    connfd = accept(socketfd, (SA*)&cli, &len);
+    communicate(connfd);
     close(connfd);
 
 
