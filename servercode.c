@@ -18,7 +18,17 @@
 // comes from sys/socket.h:
 #define TCP 6;
 #define SA struct sockaddr
+/*
+int crackSHA(uint8_t code[], uint64_t start, uint64_t end) {
+    for(uint64_t i = start; i < end; i++) {
 
+    }
+
+
+
+}
+
+*/
 void communicate(int connectionfd) {
     int inSize = PACKET_REQUEST_SIZE;
     int outSize = PACKET_RESPONSE_SIZE;
@@ -37,12 +47,9 @@ void communicate(int connectionfd) {
     // printf("From client: %d",(arr[1]));
 
     // printing the received hash:
-    /*for (int i = 31; i >= 0; i--) {
-        printf("hashnumber: number %d is %d\t",i,arr[i]);
-    }*/
-    // calculating the hash as a uint256
-    printf("\n\n");
-    //
+    for (int i = 31; i >= 0; i--) {
+        printf("hash: arr[%d] is %d\t",i,arr[i]);
+    }
 
 
     // print the start value as bytes:
@@ -57,7 +64,7 @@ void communicate(int connectionfd) {
         i64 = i64 | (arr[39-i] << i*8);
     }
     printf("start is: %ld\t",i64);
-
+    printf("Test");
     // calculating end value:
     uint64_t end = 0; // = arr[39] | (arr[38] << 8) | (arr[37] << 16) | (arr[36] << 24) | (arr[35] << 32); // | (arr[34] << 40) | (arr[33] << 48) | (arr[32] << 56);
     for (int i = 0; i < 8; i++) {
@@ -164,6 +171,7 @@ int main(int argc, char *argcv[]) {
     printf("Waiting..");
     connfd = accept(socketfd, (SA*)&cli, &len);
     printf("ACCEPTED");
+
     while (connfd) {
         if (connfd < 0) {
             printf("server acccept failed...\n");
@@ -173,6 +181,7 @@ int main(int argc, char *argcv[]) {
             printf("connfd is: %d", connfd);
             printf("server acccept the client...\n");
         }
+        printf("Testst");
         communicate(connfd);
         connfd = accept(socketfd, (SA*)&cli, &len);
     }
