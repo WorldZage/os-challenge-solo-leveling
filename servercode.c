@@ -1,6 +1,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -18,24 +20,51 @@
 // comes from sys/socket.h:
 #define TCP 6;
 #define SA struct sockaddr
-/*
-int crackSHA(uint8_t code[], uint64_t start, uint64_t end) {
-    for(uint64_t i = start; i < end; i++) {
-
+bool compareHash(unsigned char *truth,unsigned char *test) {
+    // this function compares a hash value "truth" (type: character array) with a hash value "test", to find if they are equal.
+    // will short-circuit upon inequality.
+    int size = 32;
+    for(int i = 0; i < size; i++) {
+        if(truth[i] != test[i]) {
+            return false;
+        }
     }
-
-
-
+    return true;
 }
 
-*/
-void communicate(int connectionfd) {
-    int inSize = PACKET_REQUEST_SIZE;
-    int outSize = PACKET_RESPONSE_SIZE;
-    char recBuff[inSize];
-    char sendBuff[outSize];
+uint64_t crackHash(unsigned char *truth,uint64_t start, uint64_t end) {
+    // this function will iterate through all possible hash results to find the key corresponding "truth" (type: character array).
+    size_t len = 8;
+    uint8_t testdata[len];
+    char testmessage[32];
+    bool success = false;
+    for(uint64_t i = start; i < end; i++) {
+        i = htole64(i); // ensure the same endianness for all machines.
+        memcpy(testdata,&i,len); // copy the i into a uint8_t array (which is an alias for a char array)
+        SHA256(testdata, len, (unsigned char*)testmessage);
+        //printf("i:%ld,1st: %d,2nd: %d\t",i,(unsigned char)testmessage[0],(unsigned char)testmessage[1]);
+        if(compareHash(truth,testmessage)){
+            //printf("RESULT IS : %ld\n",i);
+            success = true;
+            return i;
+        }
+        bzero(testdata,8); // deletes
+        bzero(testmessage,32); // deletes
+    }
+    if(!success) {
+       printf("FAILURE to find key\n");
+       return 0;
+        }
+}
 
-    int n;
+
+void communicate(int connectionfd) {
+    const unsigned int inSize = PACKET_REQUEST_SIZE;
+    const unsigned int outSize = PACKET_RESPONSE_SIZE;
+    unsigned char recBuff[inSize];
+    uint8_t sendBuff[outSize];
+    bzero(sendBuff, outSize);
+
     // clean the buffer
     bzero(recBuff, inSize);
 
@@ -43,45 +72,42 @@ void communicate(int connectionfd) {
     read(connectionfd, recBuff, sizeof(recBuff));
     // print buffer which contains the client contents
     int i;
-    uint8_t *arr = (uint8_t *)recBuff;
+    unsigned char *arr = recBuff;
     // printf("From client: %d",(arr[1]));
 
-    // printing the received hash:
-    for (int i = 31; i >= 0; i--) {
-        printf("hash: arr[%d] is %d\t",i,arr[i]);
-    }
 
-
-    // print the start value as bytes:
-    /*
-    for (int i = 32; i <= 39; i++) {
-        printf("start value is: number %d is %d\t",i,arr[i]);
-    }
-    */
-    // calculating the start value:
-    uint64_t i64 = 0; // = arr[39] | (arr[38] << 8) | (arr[37] << 16) | (arr[36] << 24) | (arr[35] << 32); // | (arr[34] << 40) | (arr[33] << 48) | (arr[32] << 56);
-    for (int i = 0; i < 8; i++) {
-        i64 = i64 | (arr[39-i] << i*8);
-    }
-    printf("start is: %ld\t",i64);
-    printf("Test");
-    // calculating end value:
-    uint64_t end = 0; // = arr[39] | (arr[38] << 8) | (arr[37] << 16) | (arr[36] << 24) | (arr[35] << 32); // | (arr[34] << 40) | (arr[33] << 48) | (arr[32] << 56);
-    for (int i = 0; i < 8; i++) {
-        end = end | (arr[47-i] << i*8);
-    }
-    printf("end is: %ld\t",end);
-
-    /* n = 0;
-    for (n = 0; n < inSize; n++ ) {
-        // copy server message in the buffer
-        //recBuff[n] = getchar();
-        printf("value is : %d\t",recBuff[n]);
+    // print start/end part of received message:
+    /*for (i = 32; i < inSize; i++) {
+        printf("arr[%d] is: %d.  ",i, arr[i]);
     }*/
-    //printf("is : %s",recBuff);
-    bzero(sendBuff, outSize);
-    // and send that buffer to client
+
+    // printing the received hash:
+    /*for (int i = 31; i >= 0; i--) {
+        printf("hash: arr[%d] is %d\t",i,arr[i]);
+    }*/
+
+    // calculating the start and end values:
+    uint64_t start = 0;
+    uint64_t end = 0;
+    for (uint64_t i = 0; i < 8; i++) {
+        //printf("ind %d: shift %d. ",i,arr[39-i]);
+        start = start | ((uint64_t)arr[39-i] << i*8); // casting is important, or else the bitwise shifts would cast to uint32_t ( maybe?)
+        // source: https://stackoverflow.com/a/25669375
+        end = end | ((uint64_t)arr[47-i] << i*8);
+    }
+    start = le64toh(start);
+    end = le64toh(end);
+    //printf("start is: %ld... end is: %ld.\t",start,end);
+
+
+    uint64_t key = htobe64(crackHash(arr,start,end)); // have to send the data back as big endian
+    // copy the key ínto the buffer for sending.
+    printf("key is: %ld\n",be64toh(key));
+    memcpy(sendBuff,&key,(size_t)outSize);
+    // send that buffer to client
     write(connectionfd, sendBuff, outSize);
+    // wipe it (not necessary)
+    //bzero(sendBuff, outSize);
 
 }
 
@@ -172,18 +198,21 @@ int main(int argc, char *argcv[]) {
     connfd = accept(socketfd, (SA*)&cli, &len);
     printf("ACCEPTED");
 
+    int x = 0;
+
     while (connfd) {
         if (connfd < 0) {
             printf("server acccept failed...\n");
             break;
         }
         else {
-            printf("connfd is: %d", connfd);
-            printf("server acccept the client...\n");
+            //printf("connfd is: %d", connfd);
+            //printf("server acccept the client...\n");
+            communicate(connfd);
+            printf("conn: %d. ",++x);
+            connfd = accept(socketfd, (SA*)&cli, &len);
         }
-        printf("Testst");
-        communicate(connfd);
-        connfd = accept(socketfd, (SA*)&cli, &len);
+
     }
     close(connfd);
 

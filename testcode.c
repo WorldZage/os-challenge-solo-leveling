@@ -5,6 +5,8 @@
 #include "messages.h"
 
 bool compareHash(unsigned char *truth,unsigned char *test) {
+    // this function compares a hash value "truth" (type: character array) with a hash value "test", to find if they are equal.
+    // will short-circuit upon inequality.
     int size = 32;
     for(int i = 0; i < size; i++) {
         if(truth[i] != test[i]) {
@@ -13,6 +15,30 @@ bool compareHash(unsigned char *truth,unsigned char *test) {
     }
     return true;
 }
+
+uint64_t crackHash(unsigned char *truth,uint64_t start, uint64_t end) {
+    // this function will iterate through all possible hash results to find the key corresponding "truth" (type: character array).
+    size_t len = 8;
+    uint8_t testdata[len];
+    char testmessage[32];
+    bool success = false;
+    for(uint64_t i = start; i < end; i++) {
+        memcpy(testdata,&i,len);
+        SHA256(testdata, len, (unsigned char*)testmessage);
+        //printf("i:%ld,1st: %d,2nd: %d\t",i,(unsigned char)testmessage[0],(unsigned char)testmessage[1]);
+        if(compareHash(truth,testmessage)){
+            printf("RESULT IS : %ld\n",i);
+            success = true;
+            break;
+        }
+        bzero(testdata,8); // deletes
+        bzero(testmessage,32); // deletes
+    }
+    if(!success) {
+       printf("FAILURE to find key\n");
+        }
+}
+
 
 int main(int argc, char *argcv[]) {
     char message[32];
@@ -31,8 +57,8 @@ int main(int argc, char *argcv[]) {
         //printf("hashed: %d\t",(unsigned char)message[i]);
     }
 
-
-    uint8_t testdata[8];
+    crackHash(message,1,6);
+    /*uint8_t testdata[8];
     char testmessage[32];
     for(uint64_t i = 0; i < 10; i++) {
         memcpy(testdata,&i,8);
@@ -45,7 +71,7 @@ int main(int argc, char *argcv[]) {
         bzero(testdata,8); // deletes
         bzero(testmessage,32); // deletes
 
-    }
+    }*7
 
 
     /*
@@ -61,7 +87,7 @@ int main(int argc, char *argcv[]) {
     //int SHA256_Init(SHA256_CTX *c);
     //int SHA256_Update(SHA256_CTX *c, const void *data, size_t len);
     //int SHA256_Final(unsigned char *message, SHA256_CTX *c);
-    bool t = true;
+
 }
 
 
