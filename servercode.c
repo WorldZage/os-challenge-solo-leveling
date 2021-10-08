@@ -23,7 +23,7 @@
 
 
 //threading definitions & inclusions:
-#define NUM_THREADS 1 // max number of threads
+#define NUM_THREADS 25 // max number of threads
 #include <assert.h>
 #include <pthread.h>
 
@@ -47,8 +47,8 @@ uint64_t crackHash(unsigned char *truth,uint64_t start, uint64_t end) {
     unsigned char testmessage[32];
     for(uint64_t i = start; i < end; i++) {
         i = htole64(i); // ensure the same endianness for all machines.
-        memcpy(testdata,&i,len); // copy the i into a uint8_t array (which is an alias for a char array)
-        SHA256(testdata, len, (unsigned char*)testmessage);
+        //memcpy(testdata,&i,len); // copy the i into a uint8_t array (which is an alias for a char array)
+        SHA256((unsigned char*)&i, len, (unsigned char*)testmessage);//SHA256(testdata, len, (unsigned char*)testmessage);
         //printf("i:%ld,1st: %d,2nd: %d\t",i,(unsigned char)testmessage[0],(unsigned char)testmessage[1]);
         if(compareHash(truth,testmessage)){
             //printf("RESULT IS : %ld\n",i);
@@ -110,15 +110,21 @@ void communicate(int connectionfd) {
     memcpy(sendBuff,&key,(size_t)outSize);
     // send that buffer to client
     write(connectionfd, sendBuff, outSize);
-    // wipe it (not necessary)
-    //bzero(sendBuff, outSize);
 
+    // Source: https://stackoverflow.com/questions/48583574/proper-closure-of-a-socket-other-side-gets-stuck-when-reading
+    // and https://man7.org/linux/man-pages/man2/shutdown.2.html for POSIX guidance.
+    shutdown(connectionfd, SHUT_WR);         // send an EOF condition
+    while (read(connectionfd, recBuff, sizeof(recBuff) > 0));  // wait for the peer to close its side
+    close(connectionfd);          // and actually close
+    //bzero(sendBuff, outSize); // wipe it (not necessary)
+    return;
 }
 
 // inspiration : https://en.wikipedia.org/wiki/Pthreads
 void *communication_thread(void *arguments) {
     int connfd = *((int *)arguments);
-    printf("connID:%d",connfd);
+    //printf("connID:%d",connfd);
+
     communicate(connfd);
     return NULL;
 }
@@ -176,6 +182,7 @@ int main(int argc, char *argcv[]) {
     // create socket_address variable for our server and client
     struct sockaddr_in servaddr, cli;
     bzero(&servaddr, sizeof(servaddr));
+    bzero(&cli, sizeof(cli));
     // assign IP, PORT
     servaddr.sin_port = htons(port); // htons = host_to_network_short, PORT =
     servaddr.sin_family = AF_INET; // AF_INET = 2
@@ -195,7 +202,7 @@ int main(int argc, char *argcv[]) {
 
     // will now listen for a connection, and see if it fails or not
     // number of allowed connections
-    nConn = 15;
+    nConn = 35;
     if ((listen(socketfd, nConn)) != 0) {
         printf("Listen failed...\n");
         exit(0);
@@ -204,7 +211,7 @@ int main(int argc, char *argcv[]) {
         printf("Waiting..");
         printf("Server listening..\n");
     }
-    len = sizeof(cli);
+    len = sizeof(servaddr);
 
     // Accept the data packet from client and verification
     printf("Waiting..\n");
@@ -232,6 +239,7 @@ int main(int argc, char *argcv[]) {
             }
             pthread_create(&threads[curr_thread], NULL, communication_thread,&connfd);//communicate(connfd);
             printf("conn: %d. ",++curr_conn);
+            sleep(1);
             connfd = accept(socketfd, (SA*)&cli, &len);
 
 
