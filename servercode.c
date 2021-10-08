@@ -1,68 +1,36 @@
+// C POSIX library includes : https://en.wikipedia.org/wiki/C_POSIX_library
 
+// Standard libraries:
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <strings.h>
+#include <sys/types.h>
 // POSIX OS API:
 #include <unistd.h>
 // header for packet formats:
 #include "messages.h"
 
-// for string IP to int: inet_addr("127.0.0.1")
-#include <arpa/inet.h>
-
+// Network libraries
+#include <arpa/inet.h> // for string IP to int: inet_addr("127.0.0.1")
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 // my definitions:
-// comes from sys/socket.h:
-#define TCP 6;
+#define TCP 6 // comes from sys/socket.h:
 #define SA struct sockaddr
-
+#include <hashcode.h>
 
 //threading definitions & inclusions:
-#define NUM_THREADS 25 // max number of threads
+#define NUM_THREADS 5 // max number of threads
 #include <assert.h>
 #include <pthread.h>
 
 
-bool compareHash(unsigned char *truth,unsigned char *test) {
-    // this function compares a hash value "truth" (type: character array) with a hash value "test", to find if they are equal.
-    // will short-circuit upon inequality.
-    int size = 32;
-    for(int i = 0; i < size; i++) {
-        if(truth[i] != test[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-uint64_t crackHash(unsigned char *truth,uint64_t start, uint64_t end) {
-    // this function will iterate through all possible hash results to find the key corresponding "truth" (type: character array).
-    size_t len = 8;
-    uint8_t testdata[len];
-    unsigned char testmessage[32];
-    for(uint64_t i = start; i < end; i++) {
-        i = htole64(i); // ensure the same endianness for all machines.
-        //memcpy(testdata,&i,len); // copy the i into a uint8_t array (which is an alias for a char array)
-        SHA256((unsigned char*)&i, len, (unsigned char*)testmessage);//SHA256(testdata, len, (unsigned char*)testmessage);
-        //printf("i:%ld,1st: %d,2nd: %d\t",i,(unsigned char)testmessage[0],(unsigned char)testmessage[1]);
-        if(compareHash(truth,testmessage)){
-            //printf("RESULT IS : %ld\n",i);
-            return i;
-        }
-        bzero(testdata,8); // deletes
-        bzero(testmessage,32); // deletes
-    }
-   printf("FAILURE to find key\n");
-   return 0;
-}
 
 
-void communicate(int connectionfd) {
+uint64_t communicate(int connectionfd) {
     const unsigned int inSize = PACKET_REQUEST_SIZE;
     const unsigned int outSize = PACKET_RESPONSE_SIZE;
     unsigned char recBuff[inSize];
@@ -106,7 +74,6 @@ void communicate(int connectionfd) {
 
     uint64_t key = htobe64(crackHash(arr,start,end)); // have to send the data back as big endian
     // copy the key ínto the buffer for sending.
-    printf("key is: %ld\n",be64toh(key));
     memcpy(sendBuff,&key,(size_t)outSize);
     // send that buffer to client
     write(connectionfd, sendBuff, outSize);
@@ -117,15 +84,18 @@ void communicate(int connectionfd) {
     while (read(connectionfd, recBuff, sizeof(recBuff) > 0));  // wait for the peer to close its side
     close(connectionfd);          // and actually close
     //bzero(sendBuff, outSize); // wipe it (not necessary)
-    return;
+    return key;
 }
 
 // inspiration : https://en.wikipedia.org/wiki/Pthreads
 void *communication_thread(void *arguments) {
-    int connfd = *((int *)arguments);
+    int conn_number = *((int *)arguments);
+    int thread_number = *((int *)arguments + 1);
+    int connfd = *((int *)arguments + 2);
     //printf("connID:%d",connfd);
-
-    communicate(connfd);
+    printf("Thread: %d created.\n",thread_number);
+    uint64_t key = communicate(connfd);
+    printf("Thread:%d completed. connN:%d, connID: %d, key: %ld\n",thread_number,conn_number,connfd,be64toh(key));
     return NULL;
 }
 
@@ -202,7 +172,8 @@ int main(int argc, char *argcv[]) {
 
     // will now listen for a connection, and see if it fails or not
     // number of allowed connections
-    nConn = 35;
+    // A smaller number of allowed connections seems to work better. 2 instead of 35 resulted in a much later "Connection Timeout" error.
+    nConn = 100;//35;
     if ((listen(socketfd, nConn)) != 0) {
         printf("Listen failed...\n");
         exit(0);
@@ -218,8 +189,10 @@ int main(int argc, char *argcv[]) {
     connfd = accept(socketfd, (SA*)&cli, &len);
     printf("ACCEPTED\n");
 
-    int curr_conn = 0; // current connection
-    int curr_thread = 0;
+    // current connection is stored at index 0, current thread is stored at index 1, connfd is stored at index 2:
+    //int curr_conn = 0; // current connection
+    //int curr_thread = 0;
+    int connThread[3] = {0,0,connfd};
     int result_code = 0;
     // threading:
     pthread_t threads[NUM_THREADS];
@@ -232,15 +205,16 @@ int main(int argc, char *argcv[]) {
         else {
             //printf("connfd is: %d", connfd);
             //printf("server acccept the client...\n");
-            curr_thread = curr_conn % NUM_THREADS;
-            if (curr_conn > curr_thread) {
-                result_code = pthread_join(threads[curr_thread], NULL);
+            connThread[1] = connThread[0] % NUM_THREADS; //curr_thread = curr_conn % NUM_THREADS;
+            if (connThread[0] > connThread[1]) { //(curr_conn > curr_thread) {
+                result_code = pthread_join(threads[connThread[1]], NULL);
                 assert(!result_code);
             }
-            pthread_create(&threads[curr_thread], NULL, communication_thread,&connfd);//communicate(connfd);
-            printf("conn: %d. ",++curr_conn);
+            pthread_create(&threads[connThread[1]], NULL, communication_thread,connThread);//communicate(connfd);
+            //printf("conn: %d. ",++curr_conn);
             sleep(1);
-            connfd = accept(socketfd, (SA*)&cli, &len);
+            ++connThread[0]; // = connThread[0] + 1;
+            connThread[2] = accept(socketfd, (SA*)&cli, &len); //connfd = accept(socketfd, (SA*)&cli, &len);
 
 
         }

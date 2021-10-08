@@ -44,7 +44,20 @@ uint64_t crackHash(unsigned char *truth,uint64_t start, uint64_t end) {
 }
 
 int main(int argc, char *argcv[]) {
-    const int msglength = 32;
+
+
+    int intarr[4];
+    intarr[0] = 1;
+    intarr[2] = 9;
+    for(int i = 0; i < 4; i++) {
+        printf("before:%d",intarr[i]);
+        intarr[i]++;
+        printf("after:%d\n",intarr[i]);
+    }
+
+
+    // ----------------------
+    /* const int msglength = 32;
     unsigned char message[msglength];
     //SHA256_CTX c;
     const size_t len = 8;
@@ -63,7 +76,8 @@ int main(int argc, char *argcv[]) {
     }
 
     printf("\nkey is: %ld",crackHash(message,1,6));
-
+    */
+    // -----------------------
     /*const int DataLen = 30;
     SHA_CTX shactx;
     byte digest[SHA_DIGEST_LENGTH];
