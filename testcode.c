@@ -32,14 +32,14 @@ uint64_t crackHash(unsigned char *truth,uint64_t start, uint64_t end) {
         //printf("i:%ld,1st: %d,2nd: %d\t",i,(unsigned char)testmessage[0],(unsigned char)testmessage[1]);
         if(compareHash(truth,testmessage)){
             printf("RESULT IS : %ld\n",i);
-            success = true;
-            break;
+            return i;
         }
         bzero(testdata,8); // deletes
         bzero(testmessage,32); // deletes
     }
     if(!success) {
        printf("FAILURE to find key\n");
+       return -1;
         }
 }
 
@@ -48,21 +48,22 @@ int main(int argc, char *argcv[]) {
     unsigned char message[msglength];
     //SHA256_CTX c;
     const size_t len = 8;
-    uint64_t inp = htole64(pow(2,48)-5);//htole64(5); // htole64 isn't strictly necessary as the VM runs in LE.
+    uint64_t inp = htole64(5); // htole64(pow(2,48)-5); // htole64 isn't strictly necessary as the VM runs in LE.
     uint8_t data[8];
     memcpy(data,&inp,len);
     // prints the little endian of our input
     for (int i = 0; i < 8; i++) {
         printf("res:%x .",data[i]);
     }
-    // OUTPUTS: 4a c6 a ... 4d b7 8e
-    /*
-    SHA256(data, len, (unsigned char*)message);
+    // OUTPUTS: fb ff ff ff ff ff 0 0
+
+    SHA256((unsigned char*) &inp, len, (unsigned char*)message);// SHA256(data, len, (unsigned char*)message);
     for (int i = 0; i < 32; i++) {
         printf("hashed: %d\t",(unsigned char)message[i]);
     }
-    */
-    //crackHash(message,1,6);
+
+    printf("\nkey is: %ld",crackHash(message,1,6));
+
     /*const int DataLen = 30;
     SHA_CTX shactx;
     byte digest[SHA_DIGEST_LENGTH];
@@ -83,17 +84,19 @@ int main(int argc, char *argcv[]) {
 
     return 0;*/
     //EVP_MD_CTX *hashctx;
-    EVP_MD_CTX *hashctx = EVP_MD_CTX_create();
+
+
+    /*EVP_MD_CTX *hashctx = EVP_MD_CTX_create();
     const EVP_MD *hashptr = EVP_get_digestbyname("SHA256");
     //EVP_MD *hashptr = EVP_get_digestbyname("SHA1");
 
     //EVP_MD_CTX_init(hashctx);
     // first hashed message
+    unsigned int sz = EVP_MD_CTX_size(hashctx);
     EVP_DigestInit_ex(hashctx, hashptr, NULL);
     EVP_DigestUpdate(hashctx, data, len);
 
 
-    unsigned int sz = EVP_MD_CTX_size(hashctx);
     //printf("size is:%d\n",sz);
     EVP_DigestFinal_ex(hashctx, message, &sz);
     printf("First message hash:\n");
@@ -101,9 +104,11 @@ int main(int argc, char *argcv[]) {
     for (i = 0; i < msglength; ++i) {
         printf("%x ", message[i]);
     }
-
+    // OUTPUTS: 4a c6 a ... 4d b7 8e
+    */
     //printf("tst:%ld\n",tst);
     // Hashing again, with same value:
+    /*
     uint64_t inp2 = htole64(pow(2,48)-5);
     memcpy(data,&inp2,len);
     // reseting the hash context after using DigestFinal
@@ -122,7 +127,7 @@ int main(int argc, char *argcv[]) {
     EVP_MD_CTX_free(hashctx);
 
 
-    return 0;
+    return 0;*/
 
 
 

@@ -1,0 +1,51 @@
+
+
+Differet approach on calling the hashing function(exp1.c) (EVP digest vs "one-line" hashing function):
+At current time (07/10/2021), the code seems to be too slow to be accepted by the milestone-configuration.
+The client gets to around request 25 when the server responds too slowly, and the client exits with a "Connection timed out" error.
+This seems to indicate that some slight speed up would make do - and my (naive?) hypothesis is that 
+performing the hashing with the sha::SHA256() hashing function is slower than using an EVP digest routine (as recommended by openSSL.org).
+The hypothesis is based on the fact that SHA256() might create a new context every time it's called.
+On the other hand, using the digest routine, we can reuse the same context every time, 
+only having to call an initialization function after calling the "EVP_DigestFinal()" (the hashing function of the digest routine).
+In addition, SHA256() is noted unsafe for threads in the case of message digest being NULL; 
+To ensure any problems regarding hashing and parallelism for the future, we should make use of the "correct" method - EVP digest.
+For us to gain objective clarity regarding whether SHA256() or digest routines are faster,
+we will benchmark using either function with a couple random values.
+The complete experiment procedure is the following:
+
+4 different approaches
+
+generate 1.000.000 random numbers
+
+Approach #1: TIME = 0.461s
+for each randomly generated uint64_t number,
+Copy the 8 bytes of the uint64_t into a uint8_t array, 
+then hash the array using SHA256()
+Measure time used.
+
+Approach #2: TIME = 0.610s
+Create an EVP message digest context with EVP_MD_CTX_create()
+for each randomly generated uint64_t number,
+run 
+	1. EVP_DigestInit_ex()
+        2. EVP_DigestUpdate()
+        3 .EVP_DigestFinal_ex()
+Measure time used on running the three functions for all numbers 
+(does not include time used on initially creating the context).
+
+Approach #3: TIME = 1.08s
+For each randomly generated uint64_t number,
+use the EVP_digest function, which serves as a wrapper for the three digest functions in approach #2.
+
+Approach #4: TIME = 0.445s
+same as approach #1, except instead of copying the randomly generated numbers into a uint8_t array,
+just cast the value to (unsigned char*) (seems to work, surprisingly).
+
+
+RESULTS:
+it's apparent that using the SHA256() function directly is fastest (approach #1 and #4).
+However, as it is noted to be unsafe for threading, 
+using the three EVP_digest functions may have to suffice (approach #2), 
+since (a correct implementation of) parallelism is expected to have a considerable impact 
+on speed.

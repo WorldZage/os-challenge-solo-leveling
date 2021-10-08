@@ -20,6 +20,14 @@
 // comes from sys/socket.h:
 #define TCP 6;
 #define SA struct sockaddr
+
+
+//threading definitions & inclusions:
+#define NUM_THREADS 1 // max number of threads
+#include <assert.h>
+#include <pthread.h>
+
+
 bool compareHash(unsigned char *truth,unsigned char *test) {
     // this function compares a hash value "truth" (type: character array) with a hash value "test", to find if they are equal.
     // will short-circuit upon inequality.
@@ -36,8 +44,7 @@ uint64_t crackHash(unsigned char *truth,uint64_t start, uint64_t end) {
     // this function will iterate through all possible hash results to find the key corresponding "truth" (type: character array).
     size_t len = 8;
     uint8_t testdata[len];
-    char testmessage[32];
-    bool success = false;
+    unsigned char testmessage[32];
     for(uint64_t i = start; i < end; i++) {
         i = htole64(i); // ensure the same endianness for all machines.
         memcpy(testdata,&i,len); // copy the i into a uint8_t array (which is an alias for a char array)
@@ -45,16 +52,13 @@ uint64_t crackHash(unsigned char *truth,uint64_t start, uint64_t end) {
         //printf("i:%ld,1st: %d,2nd: %d\t",i,(unsigned char)testmessage[0],(unsigned char)testmessage[1]);
         if(compareHash(truth,testmessage)){
             //printf("RESULT IS : %ld\n",i);
-            success = true;
             return i;
         }
         bzero(testdata,8); // deletes
         bzero(testmessage,32); // deletes
     }
-    if(!success) {
-       printf("FAILURE to find key\n");
-       return 0;
-        }
+   printf("FAILURE to find key\n");
+   return 0;
 }
 
 
@@ -71,7 +75,6 @@ void communicate(int connectionfd) {
     // read the message from client and copy it in buffer
     read(connectionfd, recBuff, sizeof(recBuff));
     // print buffer which contains the client contents
-    int i;
     unsigned char *arr = recBuff;
     // printf("From client: %d",(arr[1]));
 
@@ -86,10 +89,11 @@ void communicate(int connectionfd) {
         printf("hash: arr[%d] is %d\t",i,arr[i]);
     }*/
 
+    uint64_t i;
     // calculating the start and end values:
     uint64_t start = 0;
     uint64_t end = 0;
-    for (uint64_t i = 0; i < 8; i++) {
+    for (i = 0; i < 8; i++) {
         //printf("ind %d: shift %d. ",i,arr[39-i]);
         start = start | ((uint64_t)arr[39-i] << i*8); // casting is important, or else the bitwise shifts would cast to uint32_t ( maybe?)
         // source: https://stackoverflow.com/a/25669375
@@ -111,6 +115,13 @@ void communicate(int connectionfd) {
 
 }
 
+// inspiration : https://en.wikipedia.org/wiki/Pthreads
+void *communication_thread(void *arguments) {
+    int connfd = *((int *)arguments);
+    printf("connID:%d",connfd);
+    communicate(connfd);
+    return NULL;
+}
 
 int main(int argc, char *argcv[]) {
     int port;
@@ -156,7 +167,8 @@ int main(int argc, char *argcv[]) {
     // close connection and socket , then repeat.
 
     // initialize variables:
-    int len, nConn, connfd, socketfd;
+    unsigned int len, nConn;
+    int connfd, socketfd;
 
     // the -fd suffix for variable names means its a descriptor
     // create socket
@@ -172,7 +184,8 @@ int main(int argc, char *argcv[]) {
     // bind socket
     // struct sadd = struct sockaddr;
     printf("ip is: %d", (servaddr.sin_addr.s_addr));
-    setsockopt(socketfd,SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
+    setsockopt(socketfd,SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)); // set socket option to enable reuse of the port.
+    // means we can avoid problems of the port still being "used" when we quickly run the program many times, or errors happen while running.
     if (bind(socketfd, (SA*)&servaddr, sizeof(struct sockaddr)) != 0) {
         printf("socket bind failed...\n");
         exit(0);
@@ -194,11 +207,15 @@ int main(int argc, char *argcv[]) {
     len = sizeof(cli);
 
     // Accept the data packet from client and verification
-    printf("Waiting..");
+    printf("Waiting..\n");
     connfd = accept(socketfd, (SA*)&cli, &len);
-    printf("ACCEPTED");
+    printf("ACCEPTED\n");
 
-    int x = 0;
+    int curr_conn = 0; // current connection
+    int curr_thread = 0;
+    int result_code = 0;
+    // threading:
+    pthread_t threads[NUM_THREADS];
 
     while (connfd) {
         if (connfd < 0) {
@@ -208,9 +225,16 @@ int main(int argc, char *argcv[]) {
         else {
             //printf("connfd is: %d", connfd);
             //printf("server acccept the client...\n");
-            communicate(connfd);
-            printf("conn: %d. ",++x);
+            curr_thread = curr_conn % NUM_THREADS;
+            if (curr_conn > curr_thread) {
+                result_code = pthread_join(threads[curr_thread], NULL);
+                assert(!result_code);
+            }
+            pthread_create(&threads[curr_thread], NULL, communication_thread,&connfd);//communicate(connfd);
+            printf("conn: %d. ",++curr_conn);
             connfd = accept(socketfd, (SA*)&cli, &len);
+
+
         }
 
     }
