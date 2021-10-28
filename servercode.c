@@ -23,7 +23,7 @@
 #include <hashcode.h>
 
 //threading definitions & inclusions:
-#define NUM_THREADS 5 // max number of threads
+#define NUM_THREADS 5   // max number of threads
 #include <assert.h>
 #include <pthread.h>
 
@@ -99,6 +99,14 @@ void *communication_thread(void *arguments) {
     return NULL;
 }
 
+void find_usable_thread(pthread_t threads[], int num_threads) {
+    //
+    // wait until a thread is available,
+    // then answer the highest priority request.
+
+}
+
+
 int main(int argc, char *argcv[]) {
     int port;
     if (argc < 2) {
@@ -157,14 +165,18 @@ int main(int argc, char *argcv[]) {
     servaddr.sin_port = htons(port); // htons = host_to_network_short, PORT =
     servaddr.sin_family = AF_INET; // AF_INET = 2
     //servaddr.sin_addr.s_addr = inet_aton("192.168.101.10"); //htonl(INADDR_ANY); // INADDR_ANY = 0x000000
-    inet_aton("192.168.101.10", (struct in_addr*)&servaddr.sin_addr.s_addr);
+    // old IP assignment:
+    //inet_aton("192.168.101.10", (struct in_addr*)&servaddr.sin_addr.s_addr);
+    // new, 'flexible' IP assignment:
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+
     // bind socket
     // struct sadd = struct sockaddr;
-    printf("ip is: %d", (servaddr.sin_addr.s_addr));
+    //printf("ip is: %c", (servaddr.sin_addr.s_addr));
     setsockopt(socketfd,SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)); // set socket option to enable reuse of the port.
     // means we can avoid problems of the port still being "used" when we quickly run the program many times, or errors happen while running.
     if (bind(socketfd, (SA*)&servaddr, sizeof(struct sockaddr)) != 0) {
-        printf("socket bind failed...\n");
+        perror("socket bind failed...\n");
         exit(0);
     }
     else
@@ -196,6 +208,7 @@ int main(int argc, char *argcv[]) {
     int result_code = 0;
     // threading:
     pthread_t threads[NUM_THREADS];
+    //pthread_mutex_t locks[NUM_THREADS];
 
     while (connfd) {
         if (connfd < 0) {
