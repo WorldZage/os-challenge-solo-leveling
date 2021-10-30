@@ -87,23 +87,60 @@ uint64_t communicate(int connectionfd) {
     return key;
 }
 
+typedef struct {
+    int conn_number;
+    int thread_number;
+    int connfd;
+    bool *locks;
+} t_params;
+
 // inspiration : https://en.wikipedia.org/wiki/Pthreads
 void *communication_thread(void *arguments) {
+    t_params *pParam = arguments;
+    /*parameters.conn_number =
     int conn_number = *((int *)arguments);
     int thread_number = *((int *)arguments + 1);
     int connfd = *((int *)arguments + 2);
+    bool *locks = *((bool *)arguments + 3);*/
     //printf("connID:%d",connfd);
-    printf("Thread: %d created.\n",thread_number);
-    uint64_t key = communicate(connfd);
-    printf("Thread:%d completed. connN:%d, connID: %d, key: %ld\n",thread_number,conn_number,connfd,be64toh(key));
+    printf("Thread: %d created.\n",(pParam->thread_number));
+    uint64_t key = communicate(pParam->connfd);
+    printf("Thread:%d completed. connN:%d, connID: %d, key: %ld\n",pParam->thread_number,pParam->conn_number,pParam->connfd,be64toh(key));
+    pParam->locks[pParam->thread_number] = false;
+    free(pParam);
+    pParam = NULL;
     return NULL;
 }
 
-void find_usable_thread(pthread_t threads[], int num_threads) {
+// replace all four arguments with a custom struct
+void find_usable_thread(pthread_t *threads, bool *locks, int num_threads, int connfd, int curr_conn) {
     //
     // wait until a thread is available,
     // then answer the highest priority request.
+    bool occupied = true;
+    int index = 0;
+    while(occupied) {
+        if(!locks[index]) {
+            if (index > curr_conn) {
+                int join_code = pthread_join(threads[index], NULL); // ensure that the thread is finished
+                assert(!join_code); // double-ensure the thread is finished without problems
+            }
+            locks[index] = true; // "lock" the thread
+            // create communication_thread parameter:
+            t_params *params = malloc(sizeof(t_params));
 
+            params->conn_number = curr_conn;
+            params->thread_number = index;
+            params->connfd = connfd;
+            params->locks = locks;
+            //printf("index is:%d, currcon:%d,connfd:%d\n",params->thread_number,params->conn_number,params->connfd);
+            pthread_create(&threads[index], NULL, communication_thread,params); // create the thread with the communcation_thread function.
+            occupied = false;
+        }
+        index = (index + 1) % num_threads;
+    }
+
+    return;
 }
 
 
@@ -202,14 +239,12 @@ int main(int argc, char *argcv[]) {
     printf("ACCEPTED\n");
 
     // current connection is stored at index 0, current thread is stored at index 1, connfd is stored at index 2:
-    //int curr_conn = 0; // current connection
+    //int connThread[2] = {0,connfd};
     //int curr_thread = 0;
-    int connThread[3] = {0,0,connfd};
-    int result_code = 0;
+    int curr_conn = 0; // current connection
     // threading:
     pthread_t threads[NUM_THREADS];
-    //pthread_mutex_t locks[NUM_THREADS];
-
+    bool locks[NUM_THREADS] = { false };
     while (connfd) {
         if (connfd < 0) {
             printf("server acccept failed...\n");
@@ -218,17 +253,23 @@ int main(int argc, char *argcv[]) {
         else {
             //printf("connfd is: %d", connfd);
             //printf("server acccept the client...\n");
-            connThread[1] = connThread[0] % NUM_THREADS; //curr_thread = curr_conn % NUM_THREADS;
-            if (connThread[0] > connThread[1]) { //(curr_conn > curr_thread) {
+
+            /*connThread[1] = connThread[0] % NUM_THREADS; //curr_thread = curr_conn % NUM_THREADS;
+            if (connThread[0] > connThread[1]) { // ONLY if we have already looped through the thread list once, wait for a thread to open up
                 result_code = pthread_join(threads[connThread[1]], NULL);
                 assert(!result_code);
             }
             pthread_create(&threads[connThread[1]], NULL, communication_thread,connThread);//communicate(connfd);
+            *&
             //printf("conn: %d. ",++curr_conn);
             sleep(1);
             ++connThread[0]; // = connThread[0] + 1;
             connThread[2] = accept(socketfd, (SA*)&cli, &len); //connfd = accept(socketfd, (SA*)&cli, &len);
-
+            */
+            sleep(1);
+            find_usable_thread(threads, locks, NUM_THREADS, connfd, curr_conn);
+            ++curr_conn;
+            connfd = accept(socketfd, (SA*)&cli, &len); //connfd = accept(socketfd, (SA*)&cli, &len);
 
         }
 
