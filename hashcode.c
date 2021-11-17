@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include <strings.h>
+#include <string.h>
 // POSIX OS API:
 #include <unistd.h>
 // header for packet formats:
@@ -11,13 +11,23 @@
 bool compareHash(unsigned char *truth,unsigned char *test) {
     // this function compares a hash value "truth" (type: character array) with a hash value "test", to find if they are equal.
     // will short-circuit upon inequality.
-    int size = 32;
-    for(int i = 0; i < size; i++) {
+    const int size = 32;
+    int res = memcmp(truth, test, (size_t)size);
+    if(res != 0) {
+        return false;
+    }
+    else {
+        return true;
+    }
+
+
+    /*for(int i = 0; i < size; i++) {
         if(truth[i] != test[i]) {
             return false;
         }
     }
-    return true;
+
+    return true;*/
 }
 
 uint64_t crackHash(unsigned char *truth,uint64_t start, uint64_t end) {
@@ -37,7 +47,7 @@ uint64_t crackHash(unsigned char *truth,uint64_t start, uint64_t end) {
         bzero(testdata,8); // deletes
         bzero(testmessage,32); // deletes
     }
-   printf("FAILURE to find key\n");
+   printf("FAILURE to find key,start:%ld,end:%ld\n",start,end);
    return 0;
 }
 

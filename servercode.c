@@ -3,10 +3,11 @@
 // Standard libraries:
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <stdbool.h>
-#include <strings.h>
 #include <sys/types.h>
+#include <string.h>
+#include <strings.h>
+#include <sys/syscall.h>
 // POSIX OS API:
 #include <unistd.h>
 // header for packet formats:
@@ -22,11 +23,79 @@
 #define SA struct sockaddr
 #include <hashcode.h>
 
+#ifndef structs
+#define structs
+#include <auxstructs.h>
+#endif // structs
+
+#include <prioritycode.h>
+
+
 //threading definitions & inclusions:
-#define NUM_THREADS 5   // max number of threads
+#define NUM_THREADS 3 // max number of threads
 #include <assert.h>
 #include <pthread.h>
 
+
+Request read_request(int connectionfd) {
+    const unsigned int inSize = PACKET_REQUEST_SIZE;
+    const size_t hashSize = SHA256_DIGEST_LENGTH;
+    unsigned char recBuff[inSize];
+    unsigned char hash[hashSize];
+    read(connectionfd, recBuff, sizeof(recBuff));
+
+    uint64_t i;
+    // calculating the start and end values:
+    uint64_t start = 0;
+    uint64_t end = 0;
+    for (i = 0; i < 8; i++) {
+        //printf("ind %d: shift %d. ",i,arr[39-i]);
+        start = start | ((uint64_t)recBuff[39-i] << i*8); // casting is important, or else the bitwise shifts would cast to uint32_t ( maybe?)
+        // source: https://stackoverflow.com/a/25669375
+        end = end | ((uint64_t)recBuff[47-i] << i*8);
+    }
+    start = le64toh(start);
+    end = le64toh(end);
+    int priority = recBuff[48];
+    memcpy(hash,recBuff,hashSize);
+    // create the request obj
+    Request request;
+    request.connfd = connectionfd;
+    memcpy(request.hash,hash,hashSize);
+    request.start = start;
+    request.end = end;
+    request.priority = priority;
+    request.key = -1;
+    return request;
+}
+
+
+void send_key(Request request) {
+    const unsigned int inSize = PACKET_REQUEST_SIZE;
+    unsigned char recBuff[inSize];
+
+    const unsigned int outSize = PACKET_RESPONSE_SIZE;
+    uint8_t sendBuff[outSize];
+
+
+
+    //uint64_t key = htobe64(crackHash(arr,start,end)); // have to send the data back as big endian
+    uint64_t key = request.key;
+    const int connectionfd = request.connfd;
+    // copy the key ínto the buffer for sending.
+    memcpy(sendBuff,&key,(size_t)outSize);
+    // send that buffer to client
+    write(connectionfd, sendBuff, outSize);
+
+    // Source: https://stackoverflow.com/questions/48583574/proper-closure-of-a-socket-other-side-gets-stuck-when-reading
+    // and https://man7.org/linux/man-pages/man2/shutdown.2.html for POSIX guidance.
+
+
+    shutdown(connectionfd, SHUT_WR);         // send an EOF condition
+    while (read(connectionfd, recBuff, sizeof(recBuff) > 0));  // wait for the peer to close its side
+    close(connectionfd);          // and actually close
+    //bzero(sendBuff, outSize); // wipe it (not necessary)
+}
 
 
 
@@ -35,13 +104,14 @@ uint64_t communicate(int connectionfd) {
     const unsigned int outSize = PACKET_RESPONSE_SIZE;
     unsigned char recBuff[inSize];
     uint8_t sendBuff[outSize];
-    bzero(sendBuff, outSize);
 
-    // clean the buffer
+    // clean the buffers
+    /*bzero(sendBuff, outSize);
     bzero(recBuff, inSize);
-
+    */
     // read the message from client and copy it in buffer
     read(connectionfd, recBuff, sizeof(recBuff));
+
     // print buffer which contains the client contents
     unsigned char *arr = recBuff;
     // printf("From client: %d",(arr[1]));
@@ -87,12 +157,7 @@ uint64_t communicate(int connectionfd) {
     return key;
 }
 
-typedef struct {
-    int conn_number;
-    int thread_number;
-    int connfd;
-    bool *locks;
-} t_params;
+
 
 // inspiration : https://en.wikipedia.org/wiki/Pthreads
 void *communication_thread(void *arguments) {
@@ -109,6 +174,36 @@ void *communication_thread(void *arguments) {
     pParam->locks[pParam->thread_number] = false;
     free(pParam);
     pParam = NULL;
+    return NULL;
+}
+
+void *cracker_thread(void *arguments) {
+    int tid = (int)syscall(SYS_gettid);
+    printf("Thread %d created.\n",tid);
+    Request request;
+    int sleepCounter = 0;
+    const int sleepMax = 10;
+    int taskCounter = 0;
+
+
+    while(sleepCounter < sleepMax) {
+        request = get_request();
+        if(request.priority == -1) {
+            //printf("thread sleeping\n");
+            sleepCounter++;
+            sleep(2);
+        }
+        else {
+            sleepCounter = 0;
+            taskCounter++;
+            //printf("start:%ld\tend:%ld\n",request.start,request.end);
+            request.key = htobe64(crackHash(request.hash,request.start,request.end));
+            //printf("thrd %d, taskn:%d\n",tid,taskCounter);
+            send_key(request);
+        }
+    }
+    printf("Thread %d ending\n",tid);
+    printf("%d nodes remain\n",count_nodes());
     return NULL;
 }
 
@@ -138,6 +233,7 @@ void find_usable_thread(pthread_t *threads, bool *locks, int num_threads, int co
             occupied = false;
         }
         index = (index + 1) % num_threads;
+        //sleep(1);
     }
 
     return;
@@ -191,7 +287,7 @@ int main(int argc, char *argcv[]) {
     unsigned int len, nConn;
     int connfd, socketfd;
 
-    // the -fd suffix for variable names means its a descriptor
+    // the "fd" suffix for variable names means its a 'file' descriptor
     // create socket
     socketfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     // create socket_address variable for our server and client
@@ -201,15 +297,10 @@ int main(int argc, char *argcv[]) {
     // assign IP, PORT
     servaddr.sin_port = htons(port); // htons = host_to_network_short, PORT =
     servaddr.sin_family = AF_INET; // AF_INET = 2
-    //servaddr.sin_addr.s_addr = inet_aton("192.168.101.10"); //htonl(INADDR_ANY); // INADDR_ANY = 0x000000
-    // old IP assignment:
-    //inet_aton("192.168.101.10", (struct in_addr*)&servaddr.sin_addr.s_addr);
-    // new, 'flexible' IP assignment:
+    // assign flexible IP assignment:
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     // bind socket
-    // struct sadd = struct sockaddr;
-    //printf("ip is: %c", (servaddr.sin_addr.s_addr));
     setsockopt(socketfd,SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)); // set socket option to enable reuse of the port.
     // means we can avoid problems of the port still being "used" when we quickly run the program many times, or errors happen while running.
     if (bind(socketfd, (SA*)&servaddr, sizeof(struct sockaddr)) != 0) {
@@ -222,9 +313,9 @@ int main(int argc, char *argcv[]) {
     // will now listen for a connection, and see if it fails or not
     // number of allowed connections
     // A smaller number of allowed connections seems to work better. 2 instead of 35 resulted in a much later "Connection Timeout" error.
-    nConn = 100;//35;
+    nConn = 1000;
     if ((listen(socketfd, nConn)) != 0) {
-        printf("Listen failed...\n");
+        perror("Listen failed...\n");
         exit(0);
     }
     else {
@@ -242,15 +333,34 @@ int main(int argc, char *argcv[]) {
     //int connThread[2] = {0,connfd};
     //int curr_thread = 0;
     int curr_conn = 0; // current connection
+
+
+    // create the node used as access point for the linked list:
+    create_access_node();
+    // declare variables:
+    Request new_request;
+    Node *new_node;
+
     // threading:
     pthread_t threads[NUM_THREADS];
-    bool locks[NUM_THREADS] = { false };
+    // bool locks[NUM_THREADS] = { false };
+    for(int index=0;index < NUM_THREADS; index++) {
+        pthread_create(&threads[index], NULL, cracker_thread,NULL);
+    }
     while (connfd) {
         if (connfd < 0) {
             printf("server acccept failed...\n");
             break;
         }
         else {
+            //printf("nReqs:%d\n",++curr_conn);
+            new_request = read_request(connfd);
+            //printf("new request: start:%ld\tend:%ld\n",new_request.start,new_request.end);
+
+            new_node = create_node(new_request);
+            //printf("new node's start:%ld\tend:%ld\n",new_node->info.start,new_node->info.end);
+            sortinsert(new_node);
+
             //printf("connfd is: %d", connfd);
             //printf("server acccept the client...\n");
 
@@ -266,15 +376,16 @@ int main(int argc, char *argcv[]) {
             ++connThread[0]; // = connThread[0] + 1;
             connThread[2] = accept(socketfd, (SA*)&cli, &len); //connfd = accept(socketfd, (SA*)&cli, &len);
             */
-            sleep(1);
-            find_usable_thread(threads, locks, NUM_THREADS, connfd, curr_conn);
-            ++curr_conn;
+            usleep(1000);
+
+            /*find_usable_thread(threads, locks, NUM_THREADS, connfd, curr_conn);
+            ++curr_conn;*/
             connfd = accept(socketfd, (SA*)&cli, &len); //connfd = accept(socketfd, (SA*)&cli, &len);
 
         }
 
     }
-    close(connfd);
+    printf("server DONE");
 
 
 
