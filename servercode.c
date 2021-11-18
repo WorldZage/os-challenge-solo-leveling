@@ -119,7 +119,7 @@ void *cracker_thread(void *arguments) {
         request = get_request();
         if(request.priority == -1) {
             //printf("thread sleeping\n");
-            sleepCounter++;
+            //sleepCounter++; // uncomment if threads should exit after certain time has passed without new requests.
             sleep(2);
         }
         else {
@@ -255,9 +255,7 @@ int main(int argc, char *argcv[]) {
     Node *new_node;
 
     // create the hashmap:
-    printf("BEFORE\n");
     create_hashmap();
-    printf("AFTER\n");
 
     // threading:
     pthread_t threads[NUM_THREADS];
@@ -294,7 +292,10 @@ int main(int argc, char *argcv[]) {
             ++connThread[0]; // = connThread[0] + 1;
             connThread[2] = accept(socketfd, (SA*)&cli, &len); //connfd = accept(socketfd, (SA*)&cli, &len);
             */
+            // if (! curr_con % NUM_THREADS) {
             usleep(1000);
+            // }
+
 
             /*find_usable_thread(threads, locks, NUM_THREADS, connfd, curr_conn);
             ++curr_conn;*/

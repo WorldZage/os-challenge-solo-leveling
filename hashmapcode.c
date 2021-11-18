@@ -50,12 +50,10 @@ void create_hashmap() {
     //map->values = malloc(MAPSIZE*sizeof(uint64_t));
     map->load_factor = 0.0d;
     for(int i=0; i<map->size;i++) {
-        map->values[i] = 3; //SENTINEL;
+        map->values[i] = SENTINEL;
         //map->keys[i] = (uint8_t*)malloc(2 * sizeof(uint8_t)); // dynamically allocate a pointer for each hash. SHA256_DIGEST_LENGTH
     }
     //map->keys = malloc(sizeof(uint8_t[MAPSIZE][SHA256_DIGEST_LENGTH]))
-    // debug:
-    printf("hashmap's 5th value is: %ld\n",map->values[4]);
     // set the attribute of the mutex.
     pthread_mutexattr_t mutex_attr;
     pthread_mutexattr_init(&mutex_attr);
@@ -88,6 +86,9 @@ void _put_help(int index, uint64_t value, uint8_t *key) {
         map->load_factor += (1.0d / map->size);
     } // converse case should (almost) never happen.
     map->values[index] = value;
+    /*if (map->keys[index]) {
+        free((map->keys[index]));
+    }*/
     memcpy(map->keys[index],key,SHA256_DIGEST_LENGTH);
     return;
 }
@@ -119,7 +120,9 @@ uint64_t _get_help(int index, bool found_key) {
         return 0;
     }
     else if (found_key) { // case of having found the correct value.
-        return (map->values[index]);
+        uint64_t value = (map->values[index]);
+        printf("Found a key with hashmap\n");
+        return value;
     }
     else { // case of empty spot, or the key at index does not match the input_key.
         return 0;
