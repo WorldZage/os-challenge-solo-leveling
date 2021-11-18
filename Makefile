@@ -9,10 +9,10 @@ LDIR = lib
 
 LIBS=-lcrypto -pthread
 
-_DEPS = auxstructs.h prioritycode.h hashcode.h messages.h 
+_DEPS = prioritycode.h hashmapcode.h hashcode.h auxstructs.h messages.h 
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
-_OBJ = servercode.o hashcode.o prioritycode.o
+_OBJ = servercode.o hashmapcode.o hashcode.o prioritycode.o 
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 servercode: $(OBJ)

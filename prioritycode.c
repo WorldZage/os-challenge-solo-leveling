@@ -43,7 +43,6 @@ void insert_node(Node* target, Node* insert) {
     target->next = insert;
 }
 
-
 // Use a linked list to manage requests.
 void sortinsert(Node* new_node) { // return head node;
     pthread_mutex_lock(&node_lock);
