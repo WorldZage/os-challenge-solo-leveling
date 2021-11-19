@@ -292,13 +292,14 @@ int main(int argc, char *argcv[]) {
             ++connThread[0]; // = connThread[0] + 1;
             connThread[2] = accept(socketfd, (SA*)&cli, &len); //connfd = accept(socketfd, (SA*)&cli, &len);
             */
-            // if (! curr_con % NUM_THREADS) {
-            //  usleep(1000);
-            // }
+            ++curr_conn;
+            if (curr_conn % NUM_THREADS == 0) {
+              usleep(15 * 100000);
+            }
 
 
             /*find_usable_thread(threads, locks, NUM_THREADS, connfd, curr_conn);
-            ++curr_conn;*/
+            */
             connfd = accept(socketfd, (SA*)&cli, &len); //connfd = accept(socketfd, (SA*)&cli, &len);
 
         }
