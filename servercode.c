@@ -53,7 +53,6 @@ Request read_request(int connectionfd) {
     uint64_t start = 0;
     uint64_t end = 0;
     for (i = 0; i < 8; i++) {
-        //printf("ind %d: shift %d. ",i,arr[39-i]);
         start = start | ((uint64_t)recBuff[39-i] << i*8); // casting is important, or else the bitwise shifts would cast to uint32_t ( maybe?)
         // source: https://stackoverflow.com/a/25669375
         end = end | ((uint64_t)recBuff[47-i] << i*8);
@@ -69,7 +68,7 @@ Request read_request(int connectionfd) {
     request.start = start;
     request.end = end;
     request.priority = priority;
-    request.key = -1;
+    request.key = 0;
 
     return request;
 }
@@ -84,7 +83,7 @@ void send_key(Request request) {
 
 
 
-    //uint64_t key = htobe64(crackHash(arr,start,end)); // have to send the data back as big endian
+
     uint64_t key = request.key;
     const int connectionfd = request.connfd;
     // copy the key ínto the buffer for sending.
@@ -99,7 +98,6 @@ void send_key(Request request) {
     shutdown(connectionfd, SHUT_WR);         // send an EOF condition
     while (read(connectionfd, recBuff, sizeof(recBuff) > 0));  // wait for the peer to close its side
     close(connectionfd);          // and actually close
-    //bzero(sendBuff, outSize); // wipe it (not necessary)
 }
 
 
@@ -118,7 +116,7 @@ void *cracker_thread(void *arguments) {
 
     while(sleepCounter < sleepMax) {
         request = get_request();
-        if(request.priority == -1) {
+        if(request.priority == 0) {
             //printf("thread sleeping\n");
             //sleepCounter++; // uncomment if threads should exit after certain time has passed without new requests.
             sleep(2);
@@ -126,17 +124,7 @@ void *cracker_thread(void *arguments) {
         else {
             sleepCounter = 0;
             taskCounter++;
-            //printf("start:%ld\tend:%ld\n",request.start,request.end);
-
-            // hashmap_key = get(request.hash);
-            // if (hashmap_key){ // not NULL
-            // request.key = hashmap_key;
-            // }
-
-            // else {
-            // attempt to find the key in the hashmap
-
-            request.key = htobe64(crackHash(request.hash,request.start,request.end));
+            request.key = htobe64(crackHash(request.hash,request.start,request.end)); // have to send the data back as big endian
             put(request.hash, request.key);
             send_key(request);
         }
@@ -220,7 +208,6 @@ int main(int argc, char *argcv[]) {
 
     // will now listen for a connection, and see if it fails or not
     // number of allowed connections
-    // A smaller number of allowed connections seems to work better. 2 instead of 35 resulted in a much later "Connection Timeout" error.
     nConn = 1000;
     if ((listen(socketfd, nConn)) != 0) {
         perror("Listen failed...\n");
@@ -237,13 +224,7 @@ int main(int argc, char *argcv[]) {
     connfd = accept(socketfd, (SA*)&cli, &len);
     printf("ACCEPTED\n");
 
-    // current connection is stored at index 0, current thread is stored at index 1, connfd is stored at index 2:
-    //int connThread[2] = {0,connfd};
-    //int curr_thread = 0;
-    int curr_conn = 0; // current connection
-
-
-    // create the node used as access point for the linked list:
+    // create the node used as access point for the linked (priority) list:
     create_access_node();
     // declare variables:
     Request new_request;
@@ -254,7 +235,6 @@ int main(int argc, char *argcv[]) {
 
     // threading:
     pthread_t threads[NUM_THREADS];
-    // bool locks[NUM_THREADS] = { false };
     for(int index=0;index < NUM_THREADS; index++) {
         pthread_create(&threads[index], NULL, cracker_thread,NULL);
     }
@@ -264,9 +244,7 @@ int main(int argc, char *argcv[]) {
             break;
         }
         else {
-            //printf("nReqs:%d\n",++curr_conn);
             new_request = read_request(connfd);
-            //printf("new request: start:%ld\tend:%ld\n",new_request.start,new_request.end);
             uint64_t hashmap_key = get(new_request.hash);
             if (hashmap_key != 0) {
                 new_request.key = hashmap_key;
@@ -276,33 +254,6 @@ int main(int argc, char *argcv[]) {
                 new_node = create_node(new_request);
                 sortinsert(new_node);
             }
-            //printf("thrd %d, taskn:%d\n",tid,taskCounter);
-
-
-
-
-            //printf("connfd is: %d", connfd);
-            //printf("server acccept the client...\n");
-
-            /*connThread[1] = connThread[0] % NUM_THREADS; //curr_thread = curr_conn % NUM_THREADS;
-            if (connThread[0] > connThread[1]) { // ONLY if we have already looped through the thread list once, wait for a thread to open up
-                result_code = pthread_join(threads[connThread[1]], NULL);
-                assert(!result_code);
-            }
-            pthread_create(&threads[connThread[1]], NULL, communication_thread,connThread);//communicate(connfd);
-            *&
-            //printf("conn: %d. ",++curr_conn);
-            sleep(1);
-            ++connThread[0]; // = connThread[0] + 1;
-            connThread[2] = accept(socketfd, (SA*)&cli, &len); //connfd = accept(socketfd, (SA*)&cli, &len);
-            */
-            // if (! curr_con % NUM_THREADS) {
-            //  usleep(1000);
-            // }
-
-
-            /*find_usable_thread(threads, locks, NUM_THREADS, connfd, curr_conn);
-            ++curr_conn;*/
             connfd = accept(socketfd, (SA*)&cli, &len); //connfd = accept(socketfd, (SA*)&cli, &len);
 
         }

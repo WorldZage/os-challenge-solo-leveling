@@ -48,13 +48,11 @@ Hashmap *map;
 void create_hashmap() {
     map = malloc(sizeof(Hashmap));
     map->size = MAPSIZE;
-    //map->values = malloc(MAPSIZE*sizeof(uint64_t));
+
     map->load_factor = 0.0d;
     for(int i=0; i<map->size;i++) {
         map->values[i] = SENTINEL;
-        //map->keys[i] = (uint8_t*)malloc(2 * sizeof(uint8_t)); // dynamically allocate a pointer for each hash. SHA256_DIGEST_LENGTH
     }
-    //map->keys = malloc(sizeof(uint8_t[MAPSIZE][SHA256_DIGEST_LENGTH]))
     // set the attribute of the mutex.
     pthread_mutexattr_t mutex_attr;
     pthread_mutexattr_init(&mutex_attr);
@@ -85,11 +83,8 @@ int folding_hash(uint8_t *input_key) {
 void _put_help(int index, uint64_t value, uint8_t *key) {
     if(map->values[index] == SENTINEL) { // increase the load factor if it didn't replace a previous value.
         map->load_factor += (1.0d / map->size);
-    } // converse case should (almost) never happen.
+    }
     map->values[index] = value;
-    /*if (map->keys[index]) {
-        free((map->keys[index]));
-    }*/
     memcpy(map->keys[index],key,SHA256_DIGEST_LENGTH);
     return;
 }
@@ -102,7 +97,7 @@ void put(uint8_t *input_key, uint64_t value) {
     if (map->values[index] != SENTINEL) { // first attempt wasn't empty, so probe through the hashmap:
         if (!compareHash(input_key, map->keys[index])) { // case of input_key and key stored in hashmap not matching, i.e. slot already occupied
             for(int attempt = 0; attempt < ceil((1.0d - map->load_factor) * map->size)  ; attempt++) { // iterate through values using quadratic probing
-                index = lin_rehash(index);//quad_rehash(index,attempt); // calculate the rehashed value
+                index = lin_rehash(index); // calculate the rehashed value
                 // the number of attempts we make depends on the value of our load factor
                 if(map->values[index] == SENTINEL) break; // found an empty spot
                 if(compareHash(input_key, map->keys[index])) break; // value already exists in the hashmap.
@@ -122,7 +117,6 @@ uint64_t _get_help(int index, bool found_key) {
     }
     else if (found_key) { // case of having found the correct value.
         uint64_t value = (map->values[index]);
-        //printf("Found a key with hashmap\n");
         return value;
     }
     else { // case of empty spot, or the key at index does not match the input_key.
@@ -144,7 +138,7 @@ uint64_t get(uint8_t *input_key) {
         }
         else{ // if slot was full, try new slots, using a probing method
             for(int attempt = 0; attempt < (ceil(map->load_factor / 2.0d) * map->size) ; attempt++) { // iterate through (up to half of all) values using quadratic probing
-                index = lin_rehash(index);//quad_rehash(index,attempt); // calculate the rehashed value
+                index = lin_rehash(index); // calculate the rehashed value
                 if(map->values[index] == SENTINEL) break; // found an empty spot = value doesn't exist in hashmap.
                 else if(compareHash(input_key, map->keys[index])) { // we found the key, meaning we can get the value.
                     found_key = true;

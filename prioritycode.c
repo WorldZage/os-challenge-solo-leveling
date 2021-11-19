@@ -18,7 +18,7 @@ Node *head;
 void create_access_node() {
     head = malloc(sizeof(Node));
     head->next = NULL;
-    head->info.start = -1;
+    head->info.start = 0;
 
     pthread_mutexattr_t mutex_attr;
 
@@ -26,7 +26,6 @@ void create_access_node() {
     pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_ERRORCHECK);
 
     pthread_mutex_init(&node_lock,&mutex_attr);
-    //return head;
 }
 
 
@@ -44,7 +43,7 @@ void insert_node(Node* target, Node* insert) {
 }
 
 // Use a linked list to manage requests.
-void sortinsert(Node* new_node) { // return head node;
+void sortinsert(Node* new_node) {
     pthread_mutex_lock(&node_lock);
     Node *current_node = head->next; // our head node is a placeholder, to server as access point for the linked list.
     if(!current_node) { // check if the head node's "next" is NULL
@@ -66,6 +65,7 @@ void sortinsert(Node* new_node) { // return head node;
     return;
 }
 
+// counts the number of nodes in the linked list
 int count_nodes() {
     int counter = 0;
     pthread_mutex_lock(&node_lock);
@@ -83,17 +83,14 @@ Request get_request() {
     pthread_mutex_lock(&node_lock);
     Node *next_node = head->next;
     if(!next_node) { // check if the head node's "next" is NULL, meaning there's no real requests yet.
-        //printf("head had no next node\n");
         Request empty;
-        empty.priority = -1; // we use this as a flag to wait until new requests arrive.
+        empty.priority = 0; // we use this as a flag to wait until new requests arrive.
         pthread_mutex_unlock(&node_lock);
         return empty;
     }
     Request info = next_node->info;
     head->next = next_node->next;
     free(next_node);
-    //printf("nextP:%p\n",head->next);
-    //printf("get_r start:%ld\tend:%ld\n",info.start,info.end);
     pthread_mutex_unlock(&node_lock);
     return info;
 }

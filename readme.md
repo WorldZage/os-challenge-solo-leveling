@@ -14,7 +14,7 @@ When a working server was achieved, experiments were carried out to see if we co
 
 ## Structure
 
-### Code structure  
+### Code structure 
 The code has been split into relevant files;
 Main loop is located in servercode.c
 priority list is located in prioritycode.c
