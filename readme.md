@@ -43,6 +43,13 @@ NUMBER OF THREADS, HASHMAP PROBING METHOD, HASHMAP SIZE, SLEEP BETWEEN REQUESTS,
 All experiments will be performed using 2 different setups for the client requests, 3 times each:
 SETUP 1: IP=192.168.101.10 PORT=5003 SEED=5041 TOTAL=100 START=1 DIFFICULTY=30000000(3 \* 10 \*\* 7) REP=20 DELAY=750000 LAMBDA=1.5  
 SETUP 2: IP=192.168.101.10 PORT=5003 SEED=0 TOTAL=100 START=0 DIFFICULTY=3000000(3 \* 10 \*\* 6) REP=40 DELAY=100000 LAMBDA=6
+Two different configurations are used, to highlight that some implementations have different levels of efficiency depending on the situation.
+The first configuration, SETUP 1, is very similar to the run-client-milestone.sh configuration, except a starting value of 1 has been used. 
+This is to ensure the requests are always the same.
+The second configuration, SETUP 2, is a magnitude 10 smaller in difficulty compared to SETUP 1, has double the repetition probability, and 4 times the lambda value.
+Also, both seed and start value is randomised. Thus, it's a very different situation than SETUP 1.
+
+
 The result of the experiment is then the average of each setup.
 In addition, each experiment will only modify one of the properties of our basic working server.
 Thus, we can compare how important a modification would be.
@@ -161,6 +168,8 @@ Waiting means that we will accept requests, so the timing between completing and
 | Measurement 3 | 84 883 000 | 20 080 000 |
 | MEAN  | 83 637 000 | 20 922 000 |
 | %diff | 13%  | 313% |
+
+This method of waiting between requests did not pay off, and we instead had massive loss in efficiency when it comes to dealing with smaller problems
 
 
 #### HASHMAP CHECK:
