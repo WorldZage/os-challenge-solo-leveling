@@ -15,7 +15,7 @@
 // MAPSIZE should be a prime number.
 #define MAPSIZE 97
 #define SENTINEL 0
-#define LINSTEP 1
+#define LINSTEP 3
 
 #include <math.h>
 #include <stdbool.h>
@@ -66,7 +66,7 @@ void create_hashmap() {
 
 // linear probing:
 int lin_rehash(int oldkey) {
-    return (oldkey + (LINSTEP) )%map->size;
+    return (oldkey + (LINSTEP))%map->size;
 }
 
 // quadratic probing:
