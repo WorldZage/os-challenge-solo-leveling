@@ -294,7 +294,7 @@ int main(int argc, char *argcv[]) {
             */
             ++curr_conn;
             if (curr_conn % NUM_THREADS == 0) {
-              usleep(15 * 100000);
+              usleep(15 * 100000); // 1.5 seconds
             }
 
 
