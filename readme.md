@@ -140,7 +140,10 @@ The hashmap size determines how many key/value pairs we store at a time, and als
 | %diff | 5%  | -10% |
 
 #### SLEEP BETWEEN REQUESTS:
-text here!
+Sleeping between requests seems counterintuitive, but may make sense. 
+If we are accepting requests so quickly, that old requests are getting backlogged, then their time-delay will rise while we only deal with recent requests.
+Waiting means that we will accept requests, so the timing between completing and accepting new requests matches.
+
 
 #### Results:
 | SLEEP 0.5s between requests | SETUP 1 |  SETUP 2|
@@ -198,6 +201,6 @@ A- have threads handle different parts of the start-to-end encryption space, ins
 B- Multithreaded acceptance of server requests. Alternatively, using a thread of checking the hashmap, letting the main thread accept more requests  
 C- further experiment with number of threads, find which value is the true optimal between 3 to 50 threads.  
 D- improve experiment consistency/’trustworthiness’ by running the code on a native Linux computer, with server and client as the only 2 active processes.
-
+E- Change acceptance of requests to only happen when a thread is done. This way, we won't have a backlog of requests piling up. This modification only matters if the timer on requests start when we accept, and *not* when the client is ready to send it.
 
 
