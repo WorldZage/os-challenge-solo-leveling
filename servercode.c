@@ -293,7 +293,7 @@ int main(int argc, char *argcv[]) {
             connThread[2] = accept(socketfd, (SA*)&cli, &len); //connfd = accept(socketfd, (SA*)&cli, &len);
             */
             // if (! curr_con % NUM_THREADS) {
-            //  usleep(1000);
+            usleep(500000); // half a second
             // }
 
 
