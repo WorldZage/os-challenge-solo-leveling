@@ -35,7 +35,7 @@
 #include <hashmapcode.h>
 
 //threading definitions & inclusions:
-#define NUM_THREADS 3 // max number of threads
+#define NUM_THREADS 10 // max number of threads
 #include <assert.h>
 #include <pthread.h>
 

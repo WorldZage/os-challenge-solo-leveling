@@ -1,7 +1,7 @@
 #include <stdint.h>
 
 void create_hashmap();
-int lin_rehash(int oldkey, int attempt_count);
+int lin_rehash(int oldkey);
 int quad_rehash(int oldkey, int attempt_count);
 int folding_hash(uint8_t *input_key);
 void _put_help(int index, uint64_t value, uint8_t *key);
