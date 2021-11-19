@@ -13,7 +13,7 @@
 // reference: https://runestone.academy/runestone/books/published/pythonds/SortSearch/Hashing.html
 
 // MAPSIZE should be a prime number.
-#define MAPSIZE 97
+#define MAPSIZE 227
 #define SENTINEL 0
 
 #include <math.h>
