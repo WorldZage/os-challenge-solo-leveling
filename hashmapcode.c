@@ -121,7 +121,7 @@ uint64_t _get_help(int index, bool found_key) {
     }
     else if (found_key) { // case of having found the correct value.
         uint64_t value = (map->values[index]);
-        printf("Found a key with hashmap\n");
+        //printf("Found a key with hashmap\n");
         return value;
     }
     else { // case of empty spot, or the key at index does not match the input_key.
