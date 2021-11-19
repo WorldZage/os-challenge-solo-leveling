@@ -70,6 +70,7 @@ Request read_request(int connectionfd) {
     request.end = end;
     request.priority = priority;
     request.key = -1;
+
     return request;
 }
 
@@ -134,15 +135,9 @@ void *cracker_thread(void *arguments) {
 
             // else {
             // attempt to find the key in the hashmap
-            uint64_t hashmap_key = get(request.hash);
-            if (hashmap_key != 0) {
-                request.key = hashmap_key;
-            }
-            else {
-                request.key = htobe64(crackHash(request.hash,request.start,request.end));
-                put(request.hash, request.key);
-            }
-            //printf("thrd %d, taskn:%d\n",tid,taskCounter);
+
+            request.key = htobe64(crackHash(request.hash,request.start,request.end));
+            put(request.hash, request.key);
             send_key(request);
         }
     }
@@ -272,10 +267,19 @@ int main(int argc, char *argcv[]) {
             //printf("nReqs:%d\n",++curr_conn);
             new_request = read_request(connfd);
             //printf("new request: start:%ld\tend:%ld\n",new_request.start,new_request.end);
+            uint64_t hashmap_key = get(new_request.hash);
+            if (hashmap_key != 0) {
+                new_request.key = hashmap_key;
+                send_key(new_request);
+            }
+            else {
+                new_node = create_node(new_request);
+                sortinsert(new_node);
+            }
+            //printf("thrd %d, taskn:%d\n",tid,taskCounter);
 
-            new_node = create_node(new_request);
-            //printf("new node's start:%ld\tend:%ld\n",new_node->info.start,new_node->info.end);
-            sortinsert(new_node);
+
+
 
             //printf("connfd is: %d", connfd);
             //printf("server acccept the client...\n");
