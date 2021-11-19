@@ -15,6 +15,7 @@
 // MAPSIZE should be a prime number.
 #define MAPSIZE 97
 #define SENTINEL 0
+#define LINSTEP 1
 
 #include <math.h>
 #include <stdbool.h>
@@ -23,6 +24,8 @@
 
 #include "messages.h"
 #include <hashcode.h>
+
+
 
 
 // the naming convention used is to consider the hashmap as a generic hashmap structure, not in context of the server;
@@ -62,8 +65,8 @@ void create_hashmap() {
 }
 
 // linear probing:
-int lin_rehash(int oldkey, int attempt_count) {
-    return (oldkey + (attempt_count) )%map->size;
+int lin_rehash(int oldkey) {
+    return (oldkey + (LINSTEP) )%map->size;
 }
 
 // quadratic probing:
@@ -101,7 +104,7 @@ void put(uint8_t *input_key, uint64_t value) {
     if (map->values[index] != SENTINEL) { // first attempt wasn't empty, so probe through the hashmap:
         if (!compareHash(input_key, map->keys[index])) { // case of input_key and key stored in hashmap not matching, i.e. slot already occupied
             for(int attempt = 0; attempt < ceil((1.0d - map->load_factor) * map->size)  ; attempt++) { // iterate through values using quadratic probing
-                index = quad_rehash(index,attempt); // calculate the rehashed value
+                index = lin_rehash(index);//quad_rehash(index,attempt); // calculate the rehashed value
                 // the number of attempts we make depends on the value of our load factor
                 if(map->values[index] == SENTINEL) break; // found an empty spot
                 if(compareHash(input_key, map->keys[index])) break; // value already exists in the hashmap.
@@ -143,7 +146,7 @@ uint64_t get(uint8_t *input_key) {
         }
         else{ // if slot was full, try new slots, using a probing method
             for(int attempt = 0; attempt < (ceil(map->load_factor / 2.0d) * map->size) ; attempt++) { // iterate through (up to half of all) values using quadratic probing
-                index = quad_rehash(index,attempt); // calculate the rehashed value
+                index = lin_rehash(index);//quad_rehash(index,attempt); // calculate the rehashed value
                 if(map->values[index] == SENTINEL) break; // found an empty spot = value doesn't exist in hashmap.
                 else if(compareHash(input_key, map->keys[index])) { // we found the key, meaning we can get the value.
                     found_key = true;
