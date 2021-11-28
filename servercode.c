@@ -61,7 +61,7 @@ Request* read_request(int connectionfd) {
     int priority = recBuff[48];
     memcpy(hash,recBuff,hashSize);
     // create the request obj
-    Request requestptr = malloc(sizeof(Rquest));
+    Request *requestptr = malloc(sizeof(Request));
     requestptr->connfd = connectionfd;
     memcpy(requestptr->hash,hash,hashSize);
     requestptr->start = start;
@@ -83,8 +83,8 @@ void send_key(Request* requestptr) {
 
 
 
-    uint64_t key = request->key;
-    const int connectionfd = request.connfd;
+    uint64_t key = requestptr->key;
+    const int connectionfd = requestptr->connfd;
     // copy the key ínto the buffer for sending.
     memcpy(sendBuff,&key,(size_t)outSize);
     // send that buffer to client
@@ -115,7 +115,7 @@ void *cracker_thread(void *arguments) {
 
     while(sleepCounter < sleepMax) {
         requestptr = get_request();
-        if(request.priority == 0) {
+        if(requestptr->priority == 0) {
             //printf("thread sleeping\n");
             //sleepCounter++; // uncomment if threads should exit after certain time has passed without new requests.
             sleep(2);
@@ -123,9 +123,9 @@ void *cracker_thread(void *arguments) {
         else {
             sleepCounter = 0;
             taskCounter++;
-            request.key = htobe64(crackHash(request.hash,request.start,request.end)); // have to send the data back as big endian
-            put(request.hash, request.key);
-            send_key(request);
+            requestptr->key = htobe64(crackHash(requestptr->hash,requestptr->start,requestptr->end)); // have to send the data back as big endian
+            put(requestptr->hash, requestptr->key);
+            send_key(requestptr);
         }
     }
     printf("Thread %d ending\n",tid);
@@ -223,19 +223,21 @@ int main(int argc, char *argcv[]) {
     connfd = accept(socketfd, (SA*)&cli, &len);
     printf("ACCEPTED\n");
 
+
     // create the node used as access point for the linked (priority) list:
     create_access_node();
     // declare variables:
     Request* new_requestptr;
     Node *new_node;
-
     // create the hashmap:
     create_hashmap();
+
 
     // threading:
     pthread_t threads[NUM_THREADS];
     for(int index=0;index < NUM_THREADS; index++) {
         pthread_create(&threads[index], NULL, cracker_thread,NULL);
+
     }
     while (connfd) {
         if (connfd < 0) {

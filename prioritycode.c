@@ -16,7 +16,7 @@ Node *head;
 int req_counter;
 
 
-Requst* emptyrequest;
+Request* emptyrequest;
 
 
 void create_access_node() {
@@ -24,7 +24,9 @@ void create_access_node() {
 
     head = malloc(sizeof(Node));
     head->next = NULL;
-    head->info->start = 0;
+    Request *head_info = malloc(sizeof(Request));
+    head_info->start = 0;
+    head->info = head_info;
 
     pthread_mutexattr_t mutex_attr;
 
@@ -32,7 +34,7 @@ void create_access_node() {
     pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_ERRORCHECK);
 
     pthread_mutex_init(&node_lock,&mutex_attr);
-
+    emptyrequest = malloc(sizeof(Request));
     // in case no nodes in the prioritylist exists yet, we will return this "empty" request, using the priority as a flag to indicate the lack of nodes.
     emptyrequest->priority = 0; // we use this as a flag to wait until new requests arrive.
 
@@ -64,7 +66,7 @@ void sortinsert(Node* new_node) {
         return;
     }
     while(current_node->next) { // while next node is not NULL
-        if (current_node->info.priority <= new_node->info.priority) {
+        if (current_node->info->priority <= new_node->info->priority) {
             insert_node(current_node, new_node);
             pthread_mutex_unlock(&node_lock);
             return;
@@ -96,9 +98,10 @@ Request* get_request() {
     Node *next_node = head->next;
     if(!next_node) { // check if the head node's "next" is NULL, meaning there's no real requests yet.
         pthread_mutex_unlock(&node_lock);
-        return emptyrequest;
+
+        return (Request*)emptyrequest;
     }
-    Request info* = next_node->info;
+    Request *info = next_node->info;
     head->next = next_node->next;
     free(next_node);
     pthread_mutex_unlock(&node_lock);
