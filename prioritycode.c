@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #ifndef structs
 #define structs
@@ -12,13 +13,18 @@
 
 pthread_mutex_t node_lock;
 Node *head;
+int req_counter;
 
+
+Requst* emptyrequest;
 
 
 void create_access_node() {
+
+
     head = malloc(sizeof(Node));
     head->next = NULL;
-    head->info.start = 0;
+    head->info->start = 0;
 
     pthread_mutexattr_t mutex_attr;
 
@@ -26,12 +32,16 @@ void create_access_node() {
     pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_ERRORCHECK);
 
     pthread_mutex_init(&node_lock,&mutex_attr);
+
+    // in case no nodes in the prioritylist exists yet, we will return this "empty" request, using the priority as a flag to indicate the lack of nodes.
+    emptyrequest->priority = 0; // we use this as a flag to wait until new requests arrive.
+
 }
 
 
-Node* create_node(Request request) {
+Node* create_node(Request* requestptr) {
     Node *new_node = malloc(sizeof(Node));
-    new_node->info = request;
+    new_node->info = requestptr;
     new_node->next = NULL;
     return new_node;
 }
@@ -44,6 +54,8 @@ void insert_node(Node* target, Node* insert) {
 
 // Use a linked list to manage requests.
 void sortinsert(Node* new_node) {
+
+
     pthread_mutex_lock(&node_lock);
     Node *current_node = head->next; // our head node is a placeholder, to server as access point for the linked list.
     if(!current_node) { // check if the head node's "next" is NULL
@@ -79,16 +91,14 @@ int count_nodes() {
 }
 
 
-Request get_request() {
+Request* get_request() {
     pthread_mutex_lock(&node_lock);
     Node *next_node = head->next;
     if(!next_node) { // check if the head node's "next" is NULL, meaning there's no real requests yet.
-        Request empty;
-        empty.priority = 0; // we use this as a flag to wait until new requests arrive.
         pthread_mutex_unlock(&node_lock);
-        return empty;
+        return emptyrequest;
     }
-    Request info = next_node->info;
+    Request info* = next_node->info;
     head->next = next_node->next;
     free(next_node);
     pthread_mutex_unlock(&node_lock);

@@ -9,7 +9,6 @@
 #include <string.h>
 #include <strings.h>
 // not portable, should be removed for final submission.
-
 #include <sys/syscall.h>
 // POSIX OS API:
 #include <unistd.h>
@@ -41,7 +40,7 @@
 
 
 
-Request read_request(int connectionfd) {
+Request* read_request(int connectionfd) {
     const unsigned int inSize = PACKET_REQUEST_SIZE;
     const size_t hashSize = SHA256_DIGEST_LENGTH;
     unsigned char recBuff[inSize];
@@ -62,19 +61,19 @@ Request read_request(int connectionfd) {
     int priority = recBuff[48];
     memcpy(hash,recBuff,hashSize);
     // create the request obj
-    Request request;
-    request.connfd = connectionfd;
-    memcpy(request.hash,hash,hashSize);
-    request.start = start;
-    request.end = end;
-    request.priority = priority;
-    request.key = 0;
+    Request requestptr = malloc(sizeof(Rquest));
+    requestptr->connfd = connectionfd;
+    memcpy(requestptr->hash,hash,hashSize);
+    requestptr->start = start;
+    requestptr->end = end;
+    requestptr->priority = priority;
+    requestptr->key = 0;
 
-    return request;
+    return requestptr;
 }
 
 
-void send_key(Request request) {
+void send_key(Request* requestptr) {
     const unsigned int inSize = PACKET_REQUEST_SIZE;
     unsigned char recBuff[inSize];
 
@@ -84,7 +83,7 @@ void send_key(Request request) {
 
 
 
-    uint64_t key = request.key;
+    uint64_t key = request->key;
     const int connectionfd = request.connfd;
     // copy the key ínto the buffer for sending.
     memcpy(sendBuff,&key,(size_t)outSize);
@@ -94,7 +93,7 @@ void send_key(Request request) {
     // Source: https://stackoverflow.com/questions/48583574/proper-closure-of-a-socket-other-side-gets-stuck-when-reading
     // and https://man7.org/linux/man-pages/man2/shutdown.2.html for POSIX guidance.
 
-
+    free(requestptr);
     shutdown(connectionfd, SHUT_WR);         // send an EOF condition
     while (read(connectionfd, recBuff, sizeof(recBuff) > 0));  // wait for the peer to close its side
     close(connectionfd);          // and actually close
@@ -108,14 +107,14 @@ void *cracker_thread(void *arguments) {
 
 
     printf("Thread %d created.\n",tid);
-    Request request;
+    Request* requestptr;
     int sleepCounter = 0;
     const int sleepMax = 10;
     int taskCounter = 0;
 
 
     while(sleepCounter < sleepMax) {
-        request = get_request();
+        requestptr = get_request();
         if(request.priority == 0) {
             //printf("thread sleeping\n");
             //sleepCounter++; // uncomment if threads should exit after certain time has passed without new requests.
@@ -227,7 +226,7 @@ int main(int argc, char *argcv[]) {
     // create the node used as access point for the linked (priority) list:
     create_access_node();
     // declare variables:
-    Request new_request;
+    Request* new_requestptr;
     Node *new_node;
 
     // create the hashmap:
@@ -244,18 +243,18 @@ int main(int argc, char *argcv[]) {
             break;
         }
         else {
-            new_request = read_request(connfd);
-            uint64_t hashmap_key = get(new_request.hash);
+            new_requestptr = read_request(connfd);
+            uint64_t hashmap_key = get(new_requestptr->hash);
             if (hashmap_key != 0) {
-                new_request.key = hashmap_key;
-                send_key(new_request);
+                new_requestptr->key = hashmap_key;
+                send_key(new_requestptr);
             }
             else {
-                new_node = create_node(new_request);
+                new_node = create_node(new_requestptr);
                 sortinsert(new_node);
             }
             connfd = accept(socketfd, (SA*)&cli, &len); //connfd = accept(socketfd, (SA*)&cli, &len);
-
+            sleep(2);
         }
 
     }

@@ -84,6 +84,9 @@ void _put_help(int index, uint64_t value, uint8_t *key) {
     if(map->values[index] == SENTINEL) { // increase the load factor if it didn't replace a previous value.
         map->load_factor += (1.0d / map->size);
     }
+    else {
+        printf("Slot was previously occupied\n");
+    }
     map->values[index] = value;
     memcpy(map->keys[index],key,SHA256_DIGEST_LENGTH);
     return;

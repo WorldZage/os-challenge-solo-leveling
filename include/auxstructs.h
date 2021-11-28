@@ -22,7 +22,7 @@ typedef struct {
 typedef struct Node Node;
 
 struct Node {
-    Request info;
+    Request* info;
     Node* next;
 };
 
