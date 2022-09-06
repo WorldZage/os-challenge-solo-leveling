@@ -163,7 +163,7 @@ Waiting means that we will accept requests, so the timing between completing and
 
 | SLEEP 1.5s between (NUM OF THREADS) requests | SETUP 1 |  SETUP 2|
 |--|--|--|
-| Measurement 1 | 82 386 | 20 866 000 |
+| Measurement 1 | 82 386 000 | 20 866 000 |
 | Measurement 2 | 83 642 000 | 20 821 000 |
 | Measurement 3 | 84 883 000 | 20 080 000 |
 | MEAN  | 83 637 000 | 20 922 000 |
